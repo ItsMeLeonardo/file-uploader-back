@@ -30,7 +30,11 @@ const blobServiceClient = new BlobServiceClient(
   pipeline
 );
 
-const getBlobName = (filename) => `${Date.now()}-${filename}`;
+const getBlobName = (filename) => {
+  const [name, type] = filename.split(".");
+  const blobName = `${name}_${Date.now()}.${type}`;
+  return blobName;
+};
 
 // send file to azure storage
 router.get("/", async (req, res, next) => {
@@ -47,10 +51,13 @@ router.get("/", async (req, res, next) => {
         return {
           id: item.name,
           name: item.name,
+          size: item.properties.contentLength,
           url: `https://${process.env.AZURE_STORAGE_ACCOUNT_NAME}.blob.core.windows.net/${containerName}/${item.name}`,
+          type: mimeTypes.lookup(item.name),
         };
       });
     }
+
     res.status(200).json(viewData);
   } catch (err) {
     console.log({ err });
@@ -75,13 +82,27 @@ router.post("/", uploadStrategy, async (req, res) => {
   }
 });
 
-router.delete("/:name", async (req, res) => {
+router.put("/:name", async (req, res) => {
   const { name } = req.params;
   const containerClient = blobServiceClient.getContainerClient(containerName);
 
   try {
     await containerClient.deleteBlob(name);
     res.status(200).json({ name, message: "deleted" });
+  } catch (err) {
+    console.log({ err });
+    res.status(500).json({ type: "delete" });
+  }
+});
+
+router.delete("/clear", async (req, res) => {
+  const containerClient = blobServiceClient.getContainerClient(containerName);
+
+  try {
+    for await (const blob of containerClient.listBlobsFlat()) {
+      await containerClient.deleteBlob(blob.name);
+    }
+    res.status(200).json({ message: "cleaned" });
   } catch (err) {
     console.log({ err });
     res.status(500).json({ type: "delete" });
