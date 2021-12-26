@@ -75,4 +75,17 @@ router.post("/", uploadStrategy, async (req, res) => {
   }
 });
 
+router.delete("/:name", async (req, res) => {
+  const { name } = req.params;
+  const containerClient = blobServiceClient.getContainerClient(containerName);
+
+  try {
+    await containerClient.deleteBlob(name);
+    res.status(200).json({ name, message: "deleted" });
+  } catch (err) {
+    console.log({ err });
+    res.status(500).json({ type: "delete" });
+  }
+});
+
 module.exports = router;
