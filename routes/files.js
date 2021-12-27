@@ -18,7 +18,7 @@ const containerName = "file-uplodaer";
 const ONE_MEGABYTE = 1024 * 1024;
 const uploadOptions = { bufferSize: 4 * ONE_MEGABYTE, maxBuffers: 10 };
 
-const sharedKeyCredential = new StorageSharedKeyCredential(
+/* const sharedKeyCredential = new StorageSharedKeyCredential(
   process.env.AZURE_STORAGE_ACCOUNT_NAME,
   process.env.AZURE_STORAGE_ACCOUNT_ACCESS_KEY
 );
@@ -28,12 +28,21 @@ const pipeline = newPipeline(sharedKeyCredential);
 const blobServiceClient = new BlobServiceClient(
   `https://${process.env.AZURE_STORAGE_ACCOUNT_NAME}.blob.core.windows.net`,
   pipeline
+); */
+
+const blobServiceClient = BlobServiceClient.fromConnectionString(
+  process.env.AZURE_STORAGE_CONNECTION_STRING
 );
 
 const getBlobName = (filename) => {
   const [name, type] = filename.split(".");
   const blobName = `${name}<unique>${Date.now()}.${type}`;
   return blobName;
+};
+
+const getUrlBlob = (blobName) => {
+  const container = containerName;
+  return `https://${process.env.AZURE_STORAGE_ACCOUNT_NAME}.blob.core.windows.net/${container}/${blobName}`;
 };
 
 // send file to azure storage
@@ -52,7 +61,7 @@ router.get("/", async (req, res, next) => {
           id: item.name,
           name: item.name.split("<unique>")[0],
           size: item.properties.contentLength,
-          url: `https://${process.env.AZURE_STORAGE_ACCOUNT_NAME}.blob.core.windows.net/${containerName}/${item.name}`,
+          url: getUrlBlob(item.name),
           type: mimeTypes.lookup(item.name),
           status: "completed",
         };
@@ -76,7 +85,7 @@ router.post("/", uploadStrategy, async (req, res) => {
   try {
     const { bufferSize, maxBuffers } = uploadOptions;
     await blockBlobClient.uploadStream(stream, bufferSize, maxBuffers);
-    res.status(201).json({ id: blobName });
+    res.status(201).json({ id: blobName, url: getUrlBlob(blobName) });
   } catch (err) {
     console.log({ err });
     res.status(500).json({ type: "upload", error: err.message });
