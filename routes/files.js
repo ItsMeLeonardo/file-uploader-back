@@ -32,7 +32,7 @@ const blobServiceClient = new BlobServiceClient(
 
 const getBlobName = (filename) => {
   const [name, type] = filename.split(".");
-  const blobName = `${name}_${Date.now()}.${type}`;
+  const blobName = `${name}<unique>${Date.now()}.${type}`;
   return blobName;
 };
 
@@ -50,10 +50,11 @@ router.get("/", async (req, res, next) => {
       viewData.url = listBlobsResponse.segment.blobItems.map((item) => {
         return {
           id: item.name,
-          name: item.name,
+          name: item.name.split("<unique>")[0],
           size: item.properties.contentLength,
           url: `https://${process.env.AZURE_STORAGE_ACCOUNT_NAME}.blob.core.windows.net/${containerName}/${item.name}`,
           type: mimeTypes.lookup(item.name),
+          status: "completed",
         };
       });
     }
@@ -75,13 +76,14 @@ router.post("/", uploadStrategy, async (req, res) => {
   try {
     const { bufferSize, maxBuffers } = uploadOptions;
     await blockBlobClient.uploadStream(stream, bufferSize, maxBuffers);
-    res.status(201).json({ name: blobName });
+    res.status(201).json({ id: blobName });
   } catch (err) {
     console.log({ err });
     res.status(500).json({ type: "upload", error: err.message });
   }
 });
 
+// delete a file
 router.put("/:name", async (req, res) => {
   const { name } = req.params;
   const containerClient = blobServiceClient.getContainerClient(containerName);
@@ -95,6 +97,7 @@ router.put("/:name", async (req, res) => {
   }
 });
 
+// delete all files
 router.delete("/clear", async (req, res) => {
   const containerClient = blobServiceClient.getContainerClient(containerName);
 
